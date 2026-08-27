@@ -136,4 +136,4 @@ jobs:
         with:
           name: Dulz-PC-Launcher-2026
           path: Dulz-PC-Launcher-2026.apk
-          if-no-files-found: error
+          if-no-files-found: erro
