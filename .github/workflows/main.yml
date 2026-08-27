@@ -8,10 +8,12 @@ on:
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Setup Java 17
@@ -26,90 +28,108 @@ jobs:
       - name: Install Android SDK
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Cari dan Extract ZIP Project
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Extract Project ZIP
         run: |
           set -e
 
-          ZIP=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+          echo "=== FILE REPOSITORY ==="
+          ls -lah
 
-          if [ -z "$ZIP" ]; then
-            echo "ZIP project tidak ditemukan!"
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: ZIP project tidak ditemukan!"
             exit 1
           fi
 
-          echo "ZIP ditemukan: $ZIP"
+          echo "ZIP ditemukan:"
+          echo "$ZIP_FILE"
 
-          mkdir project
-          unzip -q "$ZIP" -d project
+          mkdir -p project
 
-          SETTINGS=$(find project -type f \( \
-            -name "settings.gradle.kts" -o \
-            -name "settings.gradle" \
-          \) | head -n 1)
+          unzip -q "$ZIP_FILE" -d project
+
+          echo "=== MENCARI PROJECT ANDROID ==="
+
+          SETTINGS=$(find project \
+            -type f \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+            | head -n 1)
 
           if [ -z "$SETTINGS" ]; then
-            echo "settings.gradle(.kts) tidak ditemukan!"
+            echo "ERROR: settings.gradle.kts tidak ditemukan!"
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS")
 
-          echo "Project ditemukan di: $PROJECT_DIR"
-
-          cd "$PROJECT_DIR"
+          echo "Project:"
+          echo "$PROJECT_DIR"
 
           echo "=== ISI PROJECT ==="
-          ls -la
+          ls -lah "$PROJECT_DIR"
 
-          if [ ! -d "app" ]; then
-            echo "Folder app tidak ditemukan!"
+          if [ ! -d "$PROJECT_DIR/app" ]; then
+            echo "ERROR: Folder app tidak ditemukan!"
             exit 1
           fi
 
-          if [ ! -f "settings.gradle.kts" ] && [ ! -f "settings.gradle" ]; then
-            echo "settings.gradle tidak ditemukan!"
-            exit 1
-          fi
+          echo "Struktur Android ditemukan."
 
-          echo "Struktur Android OK"
-
-      - name: Setup Gradle
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
+          validate-wrappers: false
 
       - name: Build APK
-        working-directory: project
         run: |
-          PROJECT_DIR=$(find . -type f \( \
-            -name "settings.gradle.kts" -o \
-            -name "settings.gradle" \
-          \) | head -n 1)
+          set -e
 
-          PROJECT_DIR=$(dirname "$PROJECT_DIR")
+          SETTINGS=$(find project \
+            -type f \
+            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
+            | head -n 1)
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+
+          echo "================================"
+          echo "BUILD PROJECT"
+          echo "================================"
 
           cd "$PROJECT_DIR"
 
-          echo "Building project:"
-          pwd
+          gradle assembleDebug \
+            --no-daemon \
+            --stacktrace
 
-          gradle assembleDebug --no-daemon --stacktrace
-
-      - name: Cari APK
+      - name: Find APK
         run: |
-          APK=$(find project -type f -name "app-debug.apk" | head -n 1)
+          set -e
+
+          APK=$(find project \
+            -type f \
+            -name "app-debug.apk" \
+            | head -n 1)
 
           if [ -z "$APK" ]; then
-            echo "APK tidak ditemukan!"
+            echo "ERROR: APK tidak ditemukan!"
             exit 1
           fi
 
-          echo "APK berhasil dibuat:"
+          echo "================================"
+          echo "APK BERHASIL DIBUAT"
+          echo "================================"
+
           ls -lh "$APK"
 
-          cp "$APK" ./Dulz-PC-Launcher-2026.apk
+          cp "$APK" "Dulz-PC-Launcher-2026.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
